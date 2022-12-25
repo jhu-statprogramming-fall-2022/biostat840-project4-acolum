@@ -1,0 +1,406 @@
+---
+title: "Project 4 Dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    theme: readable
+    orientation: columns
+    source_code: embed
+    vertical_layout: fill
+runtime: shiny
+---
+
+<style type="text/css">
+  p {font-size: 30px;}
+</style>
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(shiny)
+```
+
+```{r packages, message = FALSE, warning = FALSE}
+library(tidyverse)
+library(here)
+library(tidytuesdayR)
+library(DT)
+```
+
+```{r data, eval = FALSE}
+# Test if a "data" directory exists locally; if not, create it
+if(!dir.exists(here("data"))) { dir.create(here("data")) }
+
+# Save the data only once (not each time the R Markdown document is knit)
+if(!file.exists(here("data","olympics.csv"))) {
+  url_csv <- 'https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-07-27/olympics.csv'
+  olympics <- read_csv(url_csv)
+  
+  # Save the olympics file to a csv object
+  readr::write_csv(x = olympics, file = here("data","olympics.csv"))
+}
+```
+
+```{r load, message = FALSE, warning = FALSE}
+# Read in the data locally (each time the R Markdown document is knit)
+olympics <- readr::read_csv("data/olympics.csv")
+```
+
+# About {data-icon="fa-info"}
+
+## Column {data-width="40"}
+
+### 
+
+**What is the purpose of this dashboard?**
+
+<hr>
+
+This dashboard has two purposes: (1) to showcase trends among Olympic athletes (from Athens 1896 to Rio 2016), and (2) to practice building dashboards with `R`.
+
+<hr>
+
+###
+
+**Data Source**
+
+<hr>
+
+This dashboard uses the [`olympics` dataset](https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-07-27) from [TidyTuesday](https://www.tidytuesday.com).
+
+<hr>
+
+## Column {data-width="60"}
+
+### 
+
+```{r, echo=FALSE, fig.cap="[Photograph by Samuel Svec](https://unsplash.com/photos/GI3LMSfBayQ)", out.width = '100%'}
+knitr::include_graphics("https://images.unsplash.com/photo-1628542745961-252ff7ca51e5?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1170&q=80")
+```
+
+# The Data {data-icon="fa-table"}
+
+## Column {data-width="60"}
+
+### 
+
+**About the data**
+
+<hr>
+
+This dashboard uses the [`olympics` dataset](https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-07-27) from [TidyTuesday](https://www.tidytuesday.com). According to [the documentation](https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-07-27), this dataset contains information about athletic participants and medal wins in the modern Olympic Games (from Athens 1896 to Rio 2016). [More details can be found in this helpful data dictionary](https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-07-27#data-dictionary).
+
+------------------------------------------------------------------------
+
+```{r DTprep, echo=FALSE}
+# Create the dataframe for the DT table
+DT_df <- olympics %>%
+  dplyr::select(-c(id))
+```
+
+```{r DT, echo=FALSE}
+# Make the DT table
+DT::renderDataTable({
+  DT::datatable(DT_df,
+                options = list(autoWidth = TRUE,
+                               pageLength = 10,
+                               scroller = TRUE,
+                               scrollY = '500px'))
+})
+```
+
+## Column {data-width="40"}
+
+### 
+
+```{r, echo=FALSE, fig.cap="[Photograph by Todd Trapani](https://unsplash.com/photos/11hnchukldg)"}
+knitr::include_graphics("https://images.unsplash.com/photo-1548182629-4c64b91b789d?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=688&q=80")
+```
+
+# Summer Olympics {data-icon="fa-umbrella-beach"}
+
+## Column {data-width="50"}
+
+###
+
+Select the data in the chart (below) that you would like to explore in more detail in the table (to the right).
+
+```{r summer, message = FALSE, warning = FALSE}
+summer_olympics <- olympics %>% 
+  dplyr::select(-c(id)) %>% 
+  dplyr::filter(season == "Summer") %>% 
+  dplyr::distinct(name, .keep_all = TRUE) %>% 
+  dplyr::add_count(year)
+```
+
+```{r summer reactive, message = FALSE, warning = FALSE}
+selected_summer_Data <- reactive({
+  summer_data <- brushedPoints(summer_olympics, input$plot_brush) 
+  if (nrow(summer_data) == 0) {
+    summer_data <- summer_olympics
+  }
+  summer_data
+})
+```
+
+```{r summer plot, message = FALSE, warning = FALSE, fig.height=10, fig.width=12}
+plotOutput("brushplot", brush = brushOpts(id = "plot_brush"))
+
+output$brushplot <- renderPlot({
+  ggplot(summer_olympics, aes(x = year)) +
+    geom_line(aes(y = n)) +
+    geom_point(aes(y = n)) + 
+    scale_y_continuous(labels = scales::comma) +
+    labs(title = "Number of Summer Olympic Athletes Over Time (Athens 1896 to Rio 2016)",
+       subtitle = "The number of athletes who participate in the Summer Games has substantially increased over time.",
+       caption = "Data Source: TidyTuesday",
+       x = "Year",
+       y = "Number of Olympic Athletes") +
+  theme_minimal()
+})
+```
+
+## Column {data-width="50"}
+
+###
+
+```{r summer DT, message = FALSE, warning = FALSE}
+DT::renderDataTable({
+  DT::datatable(selected_summer_Data(),
+                options = list(autoWidth = TRUE,
+                               pageLength = 10,
+                               scroller = TRUE,
+                               scrollY = '500px'))
+})
+```
+
+# Winter Olympics {data-icon="fa-snowflake"}
+
+## Column {data-width="20"}
+
+###
+
+```{r winter, message = FALSE, warning = FALSE}
+winter_olympics <- olympics %>% 
+  dplyr::filter(season == "Winter") %>% 
+  dplyr::distinct(name, .keep_all = TRUE) %>% 
+  dplyr::add_count(year)
+```
+
+```{r winter reactive, message = FALSE, warning = FALSE}
+selected_winter_Data <- reactive({
+  winter_data <- winter_olympics %>% 
+    filter(year %in% input$years,
+           sport %in% input$sports)
+  if (nrow(winter_data) == 0) {
+    winter_data <- winter_olympics
+  }
+  winter_data
+})
+```
+
+```{r winter input, message = FALSE, warning = FALSE}
+selectizeInput("sports", "Sports Selection:",
+               choices = sort(unique(winter_olympics$sport)),
+               selected = sort(unique(winter_olympics$sport)),
+               multiple = TRUE)
+
+selectizeInput("years", "Year Range Selection:",
+            choices = sort(unique(winter_olympics$year)),
+            selected = sort(unique(winter_olympics$year)),
+            multiple = TRUE)
+```
+
+## Column {data-width="80"}
+
+###
+
+```{r winter plot, message = FALSE, warning = FALSE, fig.height=10, fig.width=12}
+plotOutput("inputplot")
+
+output$inputplot <- renderPlot({
+  ggplot(selected_winter_Data(), aes(x = year)) +
+    geom_line(aes(y = n)) +
+    geom_point(aes(y = n)) + 
+    scale_y_continuous(labels = scales::comma) +
+    labs(title = "Number of Winter Olympic Athletes Over Time (Athens 1896 to Rio 2016)",
+       subtitle = "The number of athletes who participate in the Winter Games has substantially increased over time.",
+       caption = "Data Source: TidyTuesday",
+       x = "Year",
+       y = "Number of Olympic Athletes") +
+  theme_minimal()
+})
+```
+
+# Sports {data-icon="fa-dumbbell"}
+
+## Column {.tabset}
+
+### Summer
+
+```{r summer sports, message = FALSE, warning = FALSE}
+olympic_summer_athletes <- olympics %>% 
+  tidyr::drop_na() %>% 
+  dplyr::filter(season == "Summer") %>% 
+  dplyr::add_count(name, sort = TRUE) %>%
+  dplyr::distinct(name, .keep_all = TRUE) %>% 
+  head(10)
+```
+
+```{r summer sports plot, message = FALSE, warning = FALSE, fig.height=10, fig.width=12}
+ggplot(data = olympic_summer_athletes, mapping = aes(x = forcats::fct_reorder(name, n), 
+                                              y = n,
+                                              fill = sport)) +
+  geom_bar(stat = "identity") +
+  scale_x_discrete(labels = scales::wrap_format(10)) +
+  coord_flip() +
+  labs(title = "Top 10 Summer Olympic Athletes' Medal Counts by Sport (Athens 1896 to Rio 2016)",
+       subtitle = "Michael Phelps (USA) earned the most Summer Olympic medals in Swimming.",
+       caption = "Data Source: TidyTuesday",
+       x = "Name of Athlete",
+       y = "Number of Olympic Medals Won",
+       fill = "Sport") +
+  theme_minimal()
+```
+
+### Winter
+
+```{r winter sports, message = FALSE, warning = FALSE}
+olympic_winter_athletes <- olympics %>% 
+  tidyr::drop_na() %>% 
+  dplyr::filter(season == "Winter") %>% 
+  dplyr::add_count(name, sort = TRUE) %>%
+  dplyr::distinct(name, .keep_all = TRUE) %>% 
+  head(10)
+```
+
+```{r winter sports plot, message = FALSE, warning = FALSE, fig.height=10, fig.width=12}
+ggplot(data = olympic_winter_athletes, mapping = aes(x = forcats::fct_reorder(name, n), 
+                                              y = n,
+                                              fill = sport)) +
+  geom_bar(stat = "identity") +
+  scale_x_discrete(labels = scales::wrap_format(10)) +
+  coord_flip() +
+  labs(title = "Top 10 Winter Olympic Athletes' Medal Counts by Sport (Athens 1896 to Rio 2016)",
+       subtitle = "Ole Einar Bjrndalen (Norway) earned the most Winter Olympic medals in the Biathlon.",
+       caption = "Data Source: TidyTuesday",
+       x = "Name of Athlete",
+       y = "Number of Olympic Medals Won",
+       fill = "Sport") +
+  theme_minimal()
+```
+
+# Athletes {data-icon="fa-medal"}
+
+## Column {data-width="30"}
+
+### 
+
+```{r, echo=FALSE, fig.cap="[Photograph by Alex Smith](https://unsplash.com/photos/J4yQp1lIJsQ)", out.width = '100%'}
+knitr::include_graphics("https://images.unsplash.com/photo-1589376807280-f86220f0b349?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=735&q=80")
+```
+
+## Column {data-width="70"}
+
+###
+
+```{r athletes, message = FALSE, warning = FALSE}
+olympic_athletes <- olympics %>% 
+  tidyr::drop_na() %>% 
+  dplyr::add_count(name, sort = TRUE) %>%
+  dplyr::distinct(name, .keep_all = TRUE) %>% 
+  head(10)
+```
+
+```{r athletes plot, message = FALSE, warning = FALSE, fig.height=10, fig.width=12}
+ggplot(data = olympic_athletes, mapping = aes(x = forcats::fct_reorder(name, n), 
+                                              y = n, fill = season)) +
+  geom_bar(stat = "identity") +
+  scale_x_discrete(labels = scales::wrap_format(10)) +
+  coord_flip() +
+  labs(title = "Top 10 Olympic Athletes' Medal Counts (Athens 1896 to Rio 2016)",
+       subtitle = "By far, Michael Phelps has won the most Olympic medals (28).",
+       caption = "Data Source: TidyTuesday",
+       x = "Name of Athlete",
+       y = "Number of Olympic Medals Won",
+       fill = "Season") +
+  theme_minimal()
+```
+
+# Analysis {data-icon="fa-chart-line"}
+
+## Column
+
+**Question**
+
+How do U.S. Winter Olympic medalists' ages compare across sexes and sports?
+
+```{r wrangle, message = FALSE, warning = FALSE}
+# Wrangling the Olympics data
+wrangled_olympics <- olympics %>% 
+  # Remove NA values from all columns (only leaves medal winners)
+  tidyr::drop_na() %>% 
+  # Filter to only include observations from US athletes, Winter games
+  dplyr::filter(noc == "USA",
+                season == "Winter") %>% 
+  # Replace "M" with "Male", "F" with "Female", 
+  dplyr::mutate(
+    sex = dplyr::if_else(sex == "M", 
+                         "Male", "Female")
+  ) %>% 
+  # Select only the variables relevant for this analysis
+  dplyr::select(sex, sport, age) 
+```
+
+**Data Visualization**
+
+To start, let's look at how the average ages compare for male and female U.S. medalists at the Winter Olympic games.
+
+```{r barplot, message = FALSE, warning = FALSE, fig.height=6, fig.width=8}
+ggplot(data = wrangled_olympics, mapping = aes(x = sex, y = age)) +
+  geom_bar(stat = "summary", fun.y = "mean", color = "black", fill = "black") +
+  labs(title = "Spread of Mean U.S. Winter Olympic Medalist Ages by Sex",
+       subtitle = "On average, male medalists tend to be slightly older than female medalists.",
+       caption = "Data Source: TidyTuesday",
+       x = "Sex",
+       y = "Mean Age (Years)") +
+  theme_minimal()
+```
+
+Although the means of male and female medalists' ages are similar, male medalists appear to be slightly older than female medalists.
+
+To further answer our question, let's look at how U.S. medalists' ages compare by different winter sports.
+
+```{r violinplot, message = FALSE, warning = FALSE, fig.height=6, fig.width=8}
+ggplot(data = wrangled_olympics, mapping = aes(sport, age, fill = sport)) +
+  geom_violin() +
+  labs(title = "Spread of U.S. Winter Olympic Medalist Ages by Sport",
+       subtitle = "Figure skating has the youngest winners, while ice hockey has the oldest.",
+       caption = "Data Source: TidyTuesday",
+       x = "Sport",
+       y = "Distribution of Age (Years)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90),
+        legend.position = "none")
+```
+
+Regardless of sex, figure skating has the youngest winners, while ice hockey has the oldest among U.S. Winter Olympic medalists.
+
+Now, let's look at both winter sports and U.S. medalist sexes. How are U.S. Winter Olympic medalists' ages spread by these two variables?
+
+```{r facetplot, message = FALSE, warning = FALSE, fig.height=6, fig.width=8}
+ggplot(data = wrangled_olympics, mapping = aes(sex, age, fill = sex)) +
+  geom_boxplot(alpha = 0.5) +
+  labs(title = "Spread of U.S. Winter Olympic Medalist Ages by Sex and Sport",
+       subtitle = "In most sports, male winners tend to be older than female winners.",
+       caption = "Data Source: TidyTuesday",
+       x = "Sex",
+       y = "Distribution of Age (Years)",
+       fill = "Sex") +
+  theme_minimal() +
+  facet_wrap(vars(sport))
+```
+
+In most Winter Olympic sports, male U.S. medalists tend to be older than female U.S. medalists. It's also interesting to note that some sports have not yet had any female medalists from the U.S. (e.g., Cross Country Skiing).
+
+**Summary of Results**
+
+In the majority of Winter Olympic sports, both the means and overall distributions of U.S. male medalists' ages are greater than those of U.S. female medalists' ages. Regardless of sex, figure skating as a winter sport has the youngest winners, while ice hockey has the oldest among all Winter Olympic U.S. medalists.
